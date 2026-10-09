@@ -47,7 +47,7 @@ enum JenisRuangan {
   LAB
 }
 
-' ==================== user (ABSTRACTION + INHERITANCE) ====================
+' user
 package "user" {
   abstract class User {
     # nomorInduk : string
@@ -118,7 +118,7 @@ User <|-- Mahasiswa
 User <|-- Dosen
 User <|-- Admin
 
-' ==================== KURIKULUM & MATA KULIAH (INHERITANCE + POLYMORPHISM) ====================
+' kurikulum dan matkul
 package "Kurikulum" {
   class Kurikulum {
     - prodi : string
@@ -303,7 +303,7 @@ package "Penilaian" {
   }
 }
 
-' ==================== SISTEM & storage (INTERFACE) ====================
+' sistem dan storage 
 package "Sistem" {
   class SistemAkademik {
     - userAktif : User*
