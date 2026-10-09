@@ -1,0 +1,367 @@
+@startuml univlink_class
+title UNIV LINK - Class Diagram 
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam shadowing false
+skinparam nodesep 40
+skinparam ranksep 70
+skinparam packageStyle rectangle
+skinparam linetype ortho
+hide empty members
+hide circles
+left to right direction
+
+' enum nilai yang nanti diterapkan
+enum NilaiHuruf {
+  A
+  A_MIN
+  A_B
+  B_PLUS
+  B
+  B_MIN
+  B_C
+  C_PLUS
+  C
+  C_MIN
+  D
+  E
+}
+enum StatusKRS {
+  DRAFT
+  DISAHKAN
+}
+enum StatusPengumuman {
+  DRAFT
+  TERBIT
+}
+enum Hari {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+}
+enum JenisRuangan {
+  KELAS
+  LAB
+}
+
+' ==================== user (ABSTRACTION + INHERITANCE) ====================
+package "user" {
+  abstract class User {
+    # nomorInduk : string
+    # nama : string
+    # email : string
+    # prodi : string
+    - passwordHash : string
+    --
+    # cetakHeader() const : void
+    + getNomorInduk() const : string
+    + getNama() const : string
+    + getProdi() const : string
+    + verifikasiPassword(password : string) const : bool
+    + gantiPassword(lama : string, baru : string) : bool
+    + {abstract} getPeran() const : string
+    + {abstract} tampilkanDashboard() const : void
+    + {abstract} tampilkanMenu() const : void
+  }
+
+  class Mahasiswa {
+    - angkatan : int
+    - semesterBerjalan : int
+    - /ipsTerakhir : double
+    - /ipk : double
+    --
+    + buatKRS(periode : string) : KRS*
+    + ambilKelas(kelas : Kelas&) : bool
+    + batalKelas(kelas : Kelas&) : bool
+    + hitungMaxSKS() const : int
+    + cekPrasyarat(mk : MataKuliah&) const : bool
+    + getIPK() const : double
+    + getIPSTerakhir() const : double
+    + lihatTranskrip() const : void
+    + lihatDetailKelas(kelas : Kelas&) const : void
+    + submitTugas(tugas : Tugas&, file : string) : bool
+    + getJadwalSemesterIni() const : vector<Kelas*>
+    + getPengumumanAktif() const : vector<Pengumuman*>
+    + getPeran() const : string
+    + tampilkanDashboard() const : void
+    + tampilkanMenu() const : void
+  }
+
+  class Dosen {
+    + getKelasDiampu() const : vector<Kelas*>
+    + buatPengumuman(kelas : Kelas&, judul : string, isi : string) : Pengumuman*
+    + editPengumuman(p : Pengumuman&, isiBaru : string) : bool
+    + buatTugas(kelas : Kelas&, judul : string, deskripsi : string,\n   deadline : time_t, bobot : double) : Tugas*
+    + beriSkorTugas(tugas : Tugas&, mhs : Mahasiswa&, skor : double) : bool
+    + inputNilai(kelas : Kelas&, mhs : Mahasiswa&, komponen : string, skor : double) : bool
+    + updateKehadiran(kelas : Kelas&, mhs : Mahasiswa&, pertemuanKe : int, hadir : bool) : bool
+    + finalisasiNilai(kelas : Kelas&) : bool
+    + getPeran() const : string
+    + tampilkanDashboard() const : void
+    + tampilkanMenu() const : void
+  }
+
+  class Admin {
+    + tambahRuangan(r : Ruangan*) : bool
+    + buatKelas(mk : MataKuliah&, dosen : Dosen&, periode : string, kuota : int) : Kelas*
+    + assignRuangan(kelas : Kelas&, r : Ruangan&, j : Jadwal) : bool
+    + getPeran() const : string
+    + tampilkanDashboard() const : void
+    + tampilkanMenu() const : void
+  }
+}
+
+User <|-- Mahasiswa
+User <|-- Dosen
+User <|-- Admin
+
+' ==================== KURIKULUM & MATA KULIAH (INHERITANCE + POLYMORPHISM) ====================
+package "Kurikulum" {
+  class Kurikulum {
+    - prodi : string
+    - tahun : int
+    - petaSemester : map<int, vector<MataKuliah*>>
+    --
+    + tambahMataKuliah(mk : MataKuliah*) : bool
+    + cariMataKuliah(kode : string) const : MataKuliah*
+    + cariMataKuliah(semester : int) const : vector<MataKuliah*>
+    + validasiGrafPrasyarat() const : bool
+  }
+
+  abstract class MataKuliah {
+    # kodeMK : string
+    # namaMK : string
+    # sks : int
+    # semester : int
+    # bobotKomponen : map<string,double>
+    - prasyarat : vector<MataKuliah*>
+    --
+    # hitungRataRataBerbobot(komponen : map<string,double>&) const : double
+    + getKode() const : string
+    + getNama() const : string
+    + getSKS() const : int
+    + getSemester() const : int
+    + getPrasyarat() const : vector<MataKuliah*>
+    + tambahPrasyarat(mk : MataKuliah*) : bool
+    + getBobotKomponen() const : map<string,double>
+    + {abstract} getJenisRuangan() const : JenisRuangan
+    + {abstract} hitungNilaiAkhir(komponen : map<string,double>) const : double
+  }
+
+  class MataKuliahTeori {
+    + MataKuliahTeori(kode, nama, sks, semester)
+    + getJenisRuangan() const : JenisRuangan
+    + hitungNilaiAkhir(komponen : map<string,double>) const : double
+  }
+
+  class MataKuliahPraktikum {
+    + MataKuliahPraktikum(kode, nama, sks, semester)
+    + getJenisRuangan() const : JenisRuangan
+    + hitungNilaiAkhir(komponen : map<string,double>) const : double
+  }
+}
+
+MataKuliah <|-- MataKuliahTeori
+MataKuliah <|-- MataKuliahPraktikum
+
+' kelas, jadwal, ruangan, krs, tugas, pengumpulan, pertemuan, pengumuman
+package "Kelas & Kegiatan" {
+  class Kelas {
+    - idKelas : string
+    - periode : string
+    - kuota : int
+    - totalPertemuan : int
+    --
+    + jumlahPeserta() const : int
+    + masihAdaKuota() const : bool
+    + daftarkan(krs : KRS*) : bool
+    + keluarkan(krs : KRS*) : bool
+    + getPeserta() const : vector<Mahasiswa*>
+    + tambahTugas(t : Tugas*) : void
+    + tambahPengumuman(p : Pengumuman*) : void
+    + catatKehadiran(mhs : Mahasiswa&, pertemuanKe : int, hadir : bool) : bool
+    + hitungPersentaseKehadiran(mhs : Mahasiswa&) const : double
+    + hitungNilaiTugas(mhs : Mahasiswa&) const : double
+    + hitungDistribusiNilai() const : map<NilaiHuruf,int>
+    + getPengumumanAktif() const : vector<Pengumuman*>
+    + bentrokDengan(lain : Kelas&) const : bool
+  }
+
+  class Jadwal {
+    - hari : Hari
+    - jamMulai : int
+    - jamSelesai : int
+    --
+    + bentrokDengan(lain : Jadwal&) const : bool
+    + toString() const : string
+  }
+
+  class Ruangan {
+    - kodeRuangan : string
+    - gedung : string
+    - kapasitas : int
+    - jenis : JenisRuangan
+    --
+    + tersedia(j : Jadwal&) const : bool
+    + pesan(kelas : Kelas*) : bool
+    + lepas(kelas : Kelas*) : void
+  }
+
+  class KRS {
+    - periode : string
+    - status : StatusKRS
+    --
+    + tambahKelas(kelas : Kelas*) : bool
+    + hapusKelas(kelas : Kelas*) : bool
+    + hitungTotalSKS() const : int
+    + validasi(kelas : Kelas&, alasan : string&) const : bool
+    + sahkan() : bool
+  }
+
+  class Tugas {
+    - idTugas : string
+    - judul : string
+    - deskripsi : string
+    - deadline : time_t
+    - bobot : double
+    --
+    + submit(mhs : Mahasiswa&, filePath : string) : bool
+    + isDeadlineLewat() const : bool
+    + getPengumpulan(mhs : Mahasiswa&) const : Pengumpulan*
+  }
+
+  class Pengumpulan {
+    - filePath : string
+    - waktuKumpul : time_t
+    - skor : double
+    - sudahDinilai : bool
+    --
+    + beriSkor(skor : double) : bool
+    + getSkor() const : double
+  }
+
+  class Pertemuan {
+    - nomor : int
+    - tanggal : time_t
+    - materi : string
+    - kehadiran : map<string,bool>
+    --
+    + catat(niu : string, hadir : bool) : void
+    + isHadir(niu : string) const : bool
+  }
+
+  class Pengumuman {
+    - id : string
+    - judul : string
+    - isi : string
+    - tanggal : time_t
+    - status : StatusPengumuman
+    --
+    + edit(isiBaru : string) : bool
+    + publikasikan() : void
+    + isAktif() const : bool
+  }
+}
+
+' penilaian
+package "Penilaian" {
+  class Nilai {
+    - komponen : map<string,double>
+    - /skorAkhir : double
+    - /nilaiHuruf : NilaiHuruf
+    - /bobotHuruf : double
+    - final : bool
+    --
+    + updateKomponen(nama : string, skor : double) : bool
+    + hitungNilaiAkhir() : double
+    + finalisasi() : bool
+    + isFinal() const : bool
+    + isLulus() const : bool
+    + getNilaiHuruf() const : NilaiHuruf
+    + getBobotHuruf() const : double
+  }
+
+  class Transkrip {
+    - listNilai : vector<Nilai*>
+    --
+    + tambahNilai(n : Nilai*) : void
+    + hitungIPS(periode : string) const : double
+    + hitungIPK() const : double
+    + hitungIPSTerakhir() const : double
+    + sudahLulus(kodeMK : string) const : bool
+    + totalSKSLulus() const : int
+  }
+
+  class KonversiNilai {
+    + {static} skorKeHuruf(skor : double) : NilaiHuruf
+    + {static} hurufKeBobot(h : NilaiHuruf) : double
+    + {static} hurufKeString(h : NilaiHuruf) : string
+    + {static} isLulus(h : NilaiHuruf) : bool
+  }
+}
+
+' ==================== SISTEM & storage (INTERFACE) ====================
+package "Sistem" {
+  class SistemAkademik {
+    - userAktif : User*
+    --
+    + login(nomorInduk : string, password : string) : User*
+    + logout() : void
+    + cariUser(nomorInduk : string) const : User*
+    + cariKelas(idKelas : string) const : Kelas*
+    + muatData() : bool
+    + simpanData() : bool
+  }
+
+  interface IPenyimpanan  {
+    + {abstract} muat(sistem : SistemAkademik&) : bool
+    + {abstract} simpan(sistem : SistemAkademik&) : bool
+  }
+
+  class PenyimpananFile {
+    - folderData : string
+    --
+    + muat(sistem : SistemAkademik&) : bool
+    + simpan(sistem : SistemAkademik&) : bool
+  }
+}
+
+IPenyimpanan <|.. PenyimpananFile
+SistemAkademik o-- "1" IPenyimpanan : memakai
+SistemAkademik "1" *-- "*" User
+SistemAkademik "1" *-- "*" Kelas
+SistemAkademik "1" *-- "*" Ruangan
+SistemAkademik "1" *-- "1..*" Kurikulum
+
+' RELASI
+Kurikulum "1" o-- "*" MataKuliah : mengatur
+MataKuliah "*" --> "0..*" MataKuliah : prasyarat
+
+Mahasiswa "*" --> "1" Kurikulum : mengikuti
+Mahasiswa "1" *-- "0..*" KRS : memiliki
+Mahasiswa "1" *-- "1" Transkrip : memiliki
+Transkrip "1" *-- "0..*" Nilai : mencatat
+
+KRS "*" -- "1..*" Kelas : memuat
+
+Kelas "*" --> "1" MataKuliah : instance dari
+Kelas "*" -- "1" Dosen : diampu oleh
+Kelas "*" -- "1" Ruangan : berlangsung di
+Kelas "1" *-- "1" Jadwal
+Kelas "1" *-- "*" Tugas : memiliki
+Kelas "1" *-- "*" Pertemuan : memiliki
+Kelas "1" *-- "*" Pengumuman : memiliki
+
+Tugas "1" *-- "*" Pengumpulan
+Pengumpulan "*" --> "1" Mahasiswa : oleh
+Pengumuman "*" --> "1" Dosen : dibuat oleh
+
+Nilai "*" --> "1" Kelas : untuk
+Nilai ..> KonversiNilai : menggunakan
+
+Admin ..> Kelas : membuat
+Admin ..> Ruangan : assign
+@enduml
