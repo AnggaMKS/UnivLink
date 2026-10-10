@@ -70,7 +70,7 @@ class Transkrip {
     map<string, const Nilai*> nilaiTerbaikPerMK() const;
 
 public:
-    void tambahNilai(Nilai* n);                     
+    void tambahNilai(unique_ptr<Nilai> n);                     
     Nilai* cariNilai(const Kelas* kelas) const;
     Nilai* ambilAtauBuatNilai(Kelas* kelas);
     double hitungIPS(const string& periode) const;
@@ -82,10 +82,10 @@ public:
 };
 
 //Kelas & kegiatan 
-class Jadwal {
+class Jadwal { // format jamne HHMM, misal 730 = 07:30
     Hari hari;
-    int jamMulai;    // format HHMM, mis. 730 = 07:30
-    int jamSelesai;  // format HHMM, mis. 1000 = 10:00
+    int jamMulai;    
+    int jamSelesai;  
 
 public:
     explicit Jadwal(Hari hari = Hari::SENIN, int jamMulai = 0, int jamSelesai = 0);
@@ -106,7 +106,7 @@ class Pertemuan {
 public:
     explicit Pertemuan(int nomor);
     int getNomor() const;
-    void setMateri(const string& m);;
+    void setMateri(const string& m);
     void setTanggal(time_t t);
     void catat(const string& niu, bool hadir);
     bool isHadir(const string& niu) const;
@@ -228,6 +228,9 @@ class Kelas {
     vector<unique_ptr<Tugas>> daftarTugas;
     vector<unique_ptr<Pertemuan>> daftarPertemuan;
     vector<unique_ptr<Pengumuman>> daftarPengumuman;
+    friend class KRS;
+    bool daftarkan(KRS* krs);
+    bool keluarkan(KRS* krs);
 
 public:
     Kelas(const string& idKelas, MataKuliah* mk, Dosen* dosen, const string& periode,
@@ -246,13 +249,11 @@ public:
 
     int jumlahPeserta() const;
     bool masihAdaKuota() const;
-    bool daftarkan(KRS* krs);
-    bool keluarkan(KRS* krs);
     vector<Mahasiswa*> getPeserta() const;
     bool memilikiPeserta(const Mahasiswa& mhs) const;
 
-    void tambahTugas(Tugas* t);              // Kelas mengambil alih kepemilikan
-    void tambahPengumuman(Pengumuman* p);    // Kelas mengambil alih kepemilikan
+    void tambahTugas(unique_ptr<Tugas> t);              // Kelas mengambil alih kepemilikan
+    void tambahPengumuman(unique_ptr<Pengumuman> p);    // Kelas mengambil alih kepemilikan
     vector<Tugas*> getDaftarTugas() const;
     vector<Pengumuman*> getDaftarPengumuman() const;
     bool memilikiTugas(const Tugas* t) const;
@@ -282,8 +283,8 @@ public:
     MataKuliah(const string& kode, const string& nama, int sks, int semester);
     virtual ~MataKuliah() = default;
 
-    string getKode() const;
-    string getNama() const;
+    const string& getKode() const;
+    const string& getNama() const;
     int getSKS() const;
     int getSemester() const;
     vector<MataKuliah*> getPrasyarat() const;
@@ -340,6 +341,7 @@ protected:
 private:
     string passwordHash;
     static string hashPassword(const string& password);
+    friend class PenyimpananFile; 
 
 public:
     User(string nomorInduk, string nama, string email, string prodi,
@@ -350,7 +352,6 @@ public:
     string getNama() const;
     string getEmail() const;
     string getProdi() const;
-    string getPasswordHash() const;
     bool verifikasiPassword(const string& password) const;
     bool gantiPassword(const string& lama, const string& baru);
 
@@ -428,7 +429,7 @@ public:
           const string& password, SistemAkademik* sistem, bool passwordSudahHash = false);
 
     // Ruangan* diambil alih SistemAkademik (jika ditolak/duplikat, objek dihapus)
-    bool tambahRuangan(Ruangan* r);
+    bool tambahRuangan(unique_ptr<Ruangan> r);
     Kelas* buatKelas(MataKuliah& mk, Dosen& dosen, const string& periode, int kuota);
     bool assignRuangan(Kelas& kelas, Ruangan& r, const Jadwal& j);
 
@@ -442,11 +443,12 @@ class IPenyimpanan {
 public:
     virtual ~IPenyimpanan() = default;
     virtual bool muat(SistemAkademik& sistem) = 0;
-    virtual bool simpan(SistemAkademik& sistem) = 0;
+    virtual bool simpan(const SistemAkademik& sistem) = 0;
 };
 
 class SistemAkademik {
     User* userAktif;
+    vector<unique_ptr<MataKuliah>> daftarMataKuliah;  // *-- "*" MataKuliah (untuk mempermudah pencarian)
     vector<unique_ptr<User>> daftarUser;            // *-- "*" User
     vector<unique_ptr<Kelas>> daftarKelas;          // *-- "*" Kelas
     vector<unique_ptr<Ruangan>> daftarRuangan;      // *-- "*" Ruangan
@@ -466,6 +468,7 @@ public:
     Ruangan* cariRuangan(const string& kode) const;
     MataKuliah* cariMataKuliah(const string& kode) const;
     Kurikulum* getKurikulum(const string& prodi) const;  // tahun terbaru
+    MataKuliah* tambahMataKuliah(unique_ptr<MataKuliah> mk);
 
     // mengembalikan nullptr jika duplikat (objek yang diserahkan ikut dihapus)
     User* tambahUser(unique_ptr<User> user);
@@ -477,9 +480,10 @@ public:
     const vector<unique_ptr<Kelas>>& getDaftarKelas() const;
     const vector<unique_ptr<Ruangan>>& getDaftarRuangan() const;
     const vector<unique_ptr<Kurikulum>>& getDaftarKurikulum() const;
+    const vector<unique_ptr<MataKuliah>>& getDaftarMataKuliah() const;
 
     bool muatData();
-    bool simpanData();
+    bool simpanData() const;
 };
 
 class PenyimpananFile : public IPenyimpanan {
@@ -488,7 +492,27 @@ class PenyimpananFile : public IPenyimpanan {
 public:
     explicit PenyimpananFile(string folderData = "data");
     bool muat(SistemAkademik& sistem) override;
-    bool simpan(SistemAkademik& sistem) override;
+    bool simpan(const SistemAkademik& sistem) override;  
+
+    // pertemuan
+    time_t getTanggal() const;
+    const string& getMateri() const;
+    const map<string, bool>& getKehadiran() const;
+
+    // announcement
+    time_t getTanggal() const;
+    void pulihkan(time_t tanggal, StatusPengumuman status); 
+
+    // pengumpulan tugas
+    void pulihkan(time_t waktu, double skor, bool sudahDinilai);
+
+    // tugas
+    const string& getDeskripsi() const;
+    vector<Pengumpulan*> getDaftarPengumpulan() const;
+    Pengumpulan* pulihkanPengumpulan(Mahasiswa* mhs, const string& file);
+
+    // kelas
+    vector<Pertemuan*> getDaftarPertemuan() const;
 };
 
-#endif  // UNIVLINK_H
+#endif 
