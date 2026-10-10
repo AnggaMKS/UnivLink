@@ -2,7 +2,7 @@
 Universities Academic Management App
 Anggota Kelompok
 - Jundi Erlangga Luhur Prawira (25/561570/TK/63456)
-- (Yuma insert bang)
+- Yuma Binar Aryaputra (25/560457/TK/63303)
 
 ## 1. Arsitektur Aplikasi
 
