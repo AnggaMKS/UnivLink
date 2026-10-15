@@ -1,5 +1,3 @@
-//DEKLARASI HEADER FILE
-
 #ifndef UNIVLINK_H
 #define UNIVLINK_H
 
@@ -110,6 +108,11 @@ public:
     void setTanggal(time_t t);
     void catat(const string& niu, bool hadir);
     bool isHadir(const string& niu) const;
+
+    //save data
+    time_t getTanggal() const;
+    const string& getMateri() const;
+    const map<string, bool>& getKehadiran() const;
 };
 
 class Pengumpulan {
@@ -128,6 +131,9 @@ public:
     Mahasiswa* getPengumpul() const;
     const string& getFilePath() const;
     time_t getWaktuKumpul() const;
+
+    //load data
+    void pulihkan(time_t waktu, double skor, bool sudahDinilai);
 };
 
 class Tugas {
@@ -148,6 +154,11 @@ public:
     bool submit(Mahasiswa& mhs, const string& filePath);
     bool isDeadlineLewat() const;
     Pengumpulan* getPengumpulan(const Mahasiswa& mhs) const;
+
+    // storage
+    const string& getDeskripsi() const;
+    vector<Pengumpulan*> getDaftarPengumpulan() const;
+    Pengumpulan* pulihkanPengumpulan(Mahasiswa* mhs, const string& file);
 };
 
 class Pengumuman {
@@ -168,6 +179,10 @@ public:
     const string& getIsi() const;
     Dosen* getPembuat() const;
     StatusPengumuman getStatus() const;
+
+    // save dan load data
+    time_t getTanggal() const;
+    void pulihkan(time_t tanggal, StatusPengumuman status);
 };
 
 class Ruangan {
@@ -264,6 +279,9 @@ public:
     map<NilaiHuruf, int> hitungDistribusiNilai() const;
     vector<Pengumuman*> getPengumumanAktif() const;
     bool bentrokDengan(const Kelas& lain) const;
+
+    // storage
+    vector<Pertemuan*> getDaftarPertemuan() const;
 };
 
 //Kurikulum
@@ -337,6 +355,8 @@ protected:
     string email;
     string prodi;
     void cetakHeader() const;
+    string pesanTerakhir;
+    void setPesan(const string& pesan) { pesanTerakhir = pesan; }
 
 private:
     string passwordHash;
@@ -354,6 +374,7 @@ public:
     string getProdi() const;
     bool verifikasiPassword(const string& password) const;
     bool gantiPassword(const string& lama, const string& baru);
+    const string& getPesanTerakhir() const { return pesanTerakhir; }
 
     virtual string getPeran() const = 0;
     virtual void tampilkanDashboard() const = 0;
@@ -409,6 +430,7 @@ public:
 
     Pengumuman* buatPengumuman(Kelas& kelas, const string& judul, const string& isi);
     bool editPengumuman(Pengumuman& p, const string& isiBaru);
+    bool publikasikanPengumuman(Pengumuman& p);
     Tugas* buatTugas(Kelas& kelas, const string& judul, const string& deskripsi,
                      time_t deadline, double bobot);
     bool beriSkorTugas(Tugas& tugas, Mahasiswa& mhs, double skor);
@@ -431,6 +453,8 @@ public:
     // Ruangan* diambil alih SistemAkademik (jika ditolak/duplikat, objek dihapus)
     bool tambahRuangan(unique_ptr<Ruangan> r);
     Kelas* buatKelas(MataKuliah& mk, Dosen& dosen, const string& periode, int kuota);
+    // memeriksa penempatan tanpa mengubah apa pun; alasan diisi bila gagal
+    bool validasiPenempatan(const Kelas& kelas, const Ruangan& r, const Jadwal& j, string& alasan) const;
     bool assignRuangan(Kelas& kelas, Ruangan& r, const Jadwal& j);
 
     string getPeran() const override;
@@ -493,26 +517,6 @@ public:
     explicit PenyimpananFile(string folderData = "data");
     bool muat(SistemAkademik& sistem) override;
     bool simpan(const SistemAkademik& sistem) override;  
-
-    // pertemuan
-    time_t getTanggal() const;
-    const string& getMateri() const;
-    const map<string, bool>& getKehadiran() const;
-
-    // announcement
-    time_t getTanggal() const;
-    void pulihkan(time_t tanggal, StatusPengumuman status); 
-
-    // pengumpulan tugas
-    void pulihkan(time_t waktu, double skor, bool sudahDinilai);
-
-    // tugas
-    const string& getDeskripsi() const;
-    vector<Pengumpulan*> getDaftarPengumpulan() const;
-    Pengumpulan* pulihkanPengumpulan(Mahasiswa* mhs, const string& file);
-
-    // kelas
-    vector<Pertemuan*> getDaftarPertemuan() const;
 };
 
 #endif 
