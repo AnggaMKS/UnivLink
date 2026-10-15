@@ -50,6 +50,11 @@ bool KRS::validasi(const Kelas& kelas, string& alasan) const {
         return false;
     }
 
+    if (!kelas.punyaJadwal() || !kelas.getRuangan()) {
+        alasan = "Kelas " + kelas.getId() + " belum memiliki ruangan/jadwal";
+        return false;
+    }
+
     const Kurikulum* kur = pemilik->getKurikulum();
     if (kur && kur->cariMataKuliah(mk->getKode()) != mk) {
         alasan = mk->getNama() + " tidak ada di kurikulum mahasiswa";
