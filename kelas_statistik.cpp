@@ -4,10 +4,9 @@
 // ===== Statistik Kelas =====
 // method: hitungPersentaseKehadiran, hitungNilaiTugas, hitungDistribusiNilai
 
-
-//hitungPersentaseKehadiran (%)
 double Kelas::hitungPersentaseKehadiran(const Mahasiswa& mhs) const {
-    if (totalPertemuan <= 0) return 0.0;
+    const int terlaksana = static_cast<int>(daftarPertemuan.size());
+    if (terlaksana == 0) return 0.0;
     if (!memilikiPeserta(mhs)) return 0.0;
 
     int jumlahHadir = 0;
@@ -19,10 +18,9 @@ double Kelas::hitungPersentaseKehadiran(const Mahasiswa& mhs) const {
         }
     }
 
-    return (static_cast<double>(jumlahHadir) / totalPertemuan) * 100.0;
+    return (static_cast<double>(jumlahHadir) / terlaksana) * 100.0;
 }
 
-// hitungNilaiTugas: nilai rata-rata berbobot dari semua tugas yang sudah dikumpulkan dan dinilai 
 double Kelas::hitungNilaiTugas(const Mahasiswa& mhs) const {
     double totalNilai = 0.0;
     double totalBobot = 0.0;
@@ -30,13 +28,20 @@ double Kelas::hitungNilaiTugas(const Mahasiswa& mhs) const {
     for (const auto& t : daftarTugas) {
         if (!t) continue;
 
-        Pengumpulan* p = t->getPengumpulan(mhs);
-        if (!p || !p->isSudahDinilai()) continue;
-
-        double bobot = t->getBobot();
+        const double bobot = t->getBobot();
         if (bobot <= 0.0) continue;
 
-        totalNilai += p->getSkor() * bobot;
+        const Pengumpulan* p = t->getPengumpulan(mhs);
+        double skor = 0.0;
+        if (p && p->isSudahDinilai()) {
+            skor = p->getSkor();
+        } else if (!p && t->isDeadlineLewat()) {
+            skor = 0.0;
+        } else {
+            continue;
+        }
+
+        totalNilai += skor * bobot;
         totalBobot += bobot;
     }
 
@@ -44,8 +49,7 @@ double Kelas::hitungNilaiTugas(const Mahasiswa& mhs) const {
     return totalNilai / totalBobot;
 }
 
-// hitungDistribusiNilai: Menghasilkan sebaran nilai huruf (A, A-, B+, …, E)
-// dari seluruh mahasiswa yang sudah difinalisasi 
+// hitungDistribusiNilai: Menghasilkan sebaran nilai huruf (A, A-, B+, …, E) dari seluruh mahasiswa yang sudah difinalisasi 
 map<NilaiHuruf, int> Kelas::hitungDistribusiNilai() const {
     map<NilaiHuruf, int> distribusi;
 

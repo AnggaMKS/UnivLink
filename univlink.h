@@ -355,6 +355,8 @@ protected:
     string email;
     string prodi;
     void cetakHeader() const;
+    string pesanTerakhir;
+    void setPesan(const string& pesan) { pesanTerakhir = pesan; }
 
 private:
     string passwordHash;
@@ -372,6 +374,7 @@ public:
     string getProdi() const;
     bool verifikasiPassword(const string& password) const;
     bool gantiPassword(const string& lama, const string& baru);
+    const string& getPesanTerakhir() const { return pesanTerakhir; }
 
     virtual string getPeran() const = 0;
     virtual void tampilkanDashboard() const = 0;
@@ -427,6 +430,7 @@ public:
 
     Pengumuman* buatPengumuman(Kelas& kelas, const string& judul, const string& isi);
     bool editPengumuman(Pengumuman& p, const string& isiBaru);
+    bool publikasikanPengumuman(Pengumuman& p);
     Tugas* buatTugas(Kelas& kelas, const string& judul, const string& deskripsi,
                      time_t deadline, double bobot);
     bool beriSkorTugas(Tugas& tugas, Mahasiswa& mhs, double skor);
@@ -449,6 +453,8 @@ public:
     // Ruangan* diambil alih SistemAkademik (jika ditolak/duplikat, objek dihapus)
     bool tambahRuangan(unique_ptr<Ruangan> r);
     Kelas* buatKelas(MataKuliah& mk, Dosen& dosen, const string& periode, int kuota);
+    // memeriksa penempatan tanpa mengubah apa pun; alasan diisi bila gagal
+    bool validasiPenempatan(const Kelas& kelas, const Ruangan& r, const Jadwal& j, string& alasan) const;
     bool assignRuangan(Kelas& kelas, Ruangan& r, const Jadwal& j);
 
     string getPeran() const override;

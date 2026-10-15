@@ -1,0 +1,4 @@
+data/
+*.o
+univlink
+uji_data_*/

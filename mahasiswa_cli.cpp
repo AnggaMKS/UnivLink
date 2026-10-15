@@ -1,36 +1,10 @@
-#include "univlink.h"
+#include "cli.h"
+#include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <limits>
-
 using namespace std;
-
-// ===== Helper cetak (internal) =====
-
-namespace {
-
-void garis(char c = '-', int n = 60) {
-    cout << string(n, c) << '\n';
-}
-
-void judul(const string& teks) {
-    garis('=');
-    cout << "  " << teks << '\n';
-    garis('=');
-}
-
-void pause() {
-    cout << "\nTekan Enter untuk kembali...";
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    cin.get();
-}
-
-string statusKRSKeString(StatusKRS s) {
-    return s == StatusKRS::DISAHKAN ? "DISAHKAN" : "DRAFT";
-}
-
-} 
-
+using namespace cli;
 
 // ===== Mahasiswa::tampilkanDashboard =====
 // Menampilkan ringkasan akademik mahasiswa: Identitas & IPK / IPS / batas SKS,
@@ -40,9 +14,6 @@ void Mahasiswa::tampilkanDashboard() const {
     judul("DASHBOARD MAHASISWA");
 
     cout << fixed << setprecision(2);
-    cout << "  Nama          : " << getNama() << '\n';
-    cout << "  NIU           : " << getNomorInduk() << '\n';
-    cout << "  Prodi         : " << getProdi() << '\n';
     cout << "  Angkatan      : " << angkatan << '\n';
     cout << "  Semester      : " << semesterBerjalan << '\n';
     cout << '\n';
@@ -122,6 +93,7 @@ void Mahasiswa::tampilkanMenu() const {
     cout << "  4. Lihat Transkrip Nilai\n";
     cout << "  5. Detail Kelas & Portal Tugas\n";
     cout << "  6. Lihat Pengumuman\n";
+    cout << "  7. Ganti Kata Sandi\n";
     cout << "  0. Logout\n";
     garis('-');
     cout << "  Pilihan Anda: ";
@@ -131,7 +103,15 @@ void Mahasiswa::tampilkanMenu() const {
 // ===== Method pendukung dashboard =====
 
 int Mahasiswa::hitungMaxSKS() const {
-    double ips = getIPSTerakhir();
+    constexpr int SKS_SEMESTER_PERTAMA = 20;
+
+    bool adaNilaiFinal = false;
+    for (const auto& n : transkrip.getListNilai()) {
+        if (n && n->isFinal()) { adaNilaiFinal = true; break; }
+    }
+    if (!adaNilaiFinal) return SKS_SEMESTER_PERTAMA;
+
+    const double ips = std::round(getIPSTerakhir() * 100.0) / 100.0;
     if (ips >= 3.00) return 24;
     if (ips >= 2.50) return 21;
     if (ips >= 2.00) return 18;
@@ -159,11 +139,19 @@ double Mahasiswa::getIPSTerakhir() const {
 void Mahasiswa::lihatTranskrip() const {
     judul("TRANSKRIP NILAI");
 
-    const auto& daftar = transkrip.getListNilai();
-    if (daftar.empty()) {
+    vector<const Nilai*> final;
+    for (const auto& n : transkrip.getListNilai()) {
+        if (n && n->isFinal() && n->getKelas() && n->getKelas()->getMataKuliah()) final.push_back(n.get());
+    }
+    if (final.empty()) {
         cout << "  Belum ada nilai yang tercatat.\n";
         return;
     }
+    sort(final.begin(), final.end(), [](const Nilai* a, const Nilai* b) {
+        if (a->getKelas()->getPeriode() != b->getKelas()->getPeriode())
+            return a->getKelas()->getPeriode() < b->getKelas()->getPeriode();
+        return a->getKelas()->getMataKuliah()->getKode() < b->getKelas()->getMataKuliah()->getKode();
+    });
 
     cout << left
          << setw(12) << "  Kode"
@@ -175,9 +163,7 @@ void Mahasiswa::lihatTranskrip() const {
     garis('-');
 
     cout << fixed << setprecision(2);
-    for (const auto& n : daftar) {
-        if (!n || !n->isFinal() || !n->getKelas() || !n->getKelas()->getMataKuliah()) continue;
-
+    for (const Nilai* n : final) {
         const MataKuliah* mk = n->getKelas()->getMataKuliah();
         cout << "  " << left
              << setw(10) << mk->getKode()
@@ -186,9 +172,11 @@ void Mahasiswa::lihatTranskrip() const {
              << setw(8)  << KonversiNilai::hurufKeString(n->getNilaiHuruf())
              << setw(8)  << n->getBobotHuruf()
              << n->getKelas()->getPeriode() << '\n';
+        cout << "      sebaran kelas: " << ringkasDistribusi(*n->getKelas()) << '\n';
     }
 
     cout << '\n';
+    cout << "  IPS Terakhir  : " << getIPSTerakhir() << '\n';
     cout << "  IPK           : " << getIPK() << '\n';
     cout << "  Total SKS Lulus: " << transkrip.totalSKSLulus() << '\n';
     garis('=');
@@ -218,6 +206,37 @@ void Mahasiswa::lihatDetailKelas(const Kelas& kelas) const {
     // Nilai tugas
     double nilaiTugas = kelas.hitungNilaiTugas(*this);
     cout << "  Nilai Tugas   : " << setprecision(2) << nilaiTugas << '\n';
+    cout << '\n';
+    garis();
+    cout << "  RINCIAN NILAI\n";
+    garis();
+    const Nilai* nilai = transkrip.cariNilai(&kelas);
+    cout << fixed << setprecision(2);
+    for (const auto& [nama, bobotPersen] : mk->getBobotKomponen()) {
+        cout << "  " << left << setw(12) << nama << "(bobot " << setw(5) << bobotPersen << "%)  ";
+        const double* skorTersimpan = nullptr;
+        if (nilai) {
+            auto it = nilai->getKomponen().find(nama);
+            if (it != nilai->getKomponen().end()) skorTersimpan = &it->second;
+        }
+        if (skorTersimpan) {
+            cout << *skorTersimpan << '\n';
+        } else if (nama == "tugas") {
+            cout << nilaiTugas << "  (sementara, dari tugas yang sudah dinilai)\n";
+        } else if (nama == "kehadiran") {
+            cout << persen << "  (sementara, dari presensi)\n";
+        } else {
+            cout << "-  (belum diinput dosen)\n";
+        }
+    }
+    if (nilai && nilai->isFinal()) {
+        cout << "  Nilai akhir   : " << nilai->getSkorAkhir()
+             << "  ->  " << KonversiNilai::hurufKeString(nilai->getNilaiHuruf())
+             << "  (bobot " << nilai->getBobotHuruf() << ")\n";
+        cout << "  Sebaran kelas : " << ringkasDistribusi(kelas) << '\n';
+    } else {
+        cout << "  Nilai akhir   : belum difinalisasi dosen\n";
+    }
 
     // Daftar tugas
     cout << '\n';
@@ -290,14 +309,21 @@ vector<Pengumuman*> Mahasiswa::getPengumumanAktif() const {
              return a->getTanggal() > b->getTanggal();
          });
 
-    // Hilangkan duplikat jika adsa
-    auto last = unique(hasil.begin(), hasil.end());
-    hasil.erase(last, hasil.end());
     return hasil;
 }
 
+// Hanya peserta kelas pemilik tugas yang boleh mengumpulkan 
 bool Mahasiswa::submitTugas(Tugas& tugas, const string& file) {
-    return tugas.submit(*this, file);
+    if (file.empty()) return false;
+    for (const auto& krs : daftarKRS) {
+        if (!krs) continue;
+        for (const Kelas* kelas : krs->getDaftarKelas()) {
+            if (kelas && kelas->memilikiTugas(&tugas) && kelas->memilikiPeserta(*this)) {
+                return tugas.submit(*this, file);
+            }
+        }
+    }
+    return false;
 }
 
 

@@ -1,155 +1,399 @@
 # UnivLink
-Universities Academic Management App
-Anggota Kelompok
+
+**UnivLink** adalah aplikasi manajemen akademik universitas berbasis C++17 dan
+Object-Oriented Programming (OOP). Aplikasi ini menyediakan alur akademik untuk
+mahasiswa, dosen, dan admin: pengelolaan kurikulum, kelas, KRS, jadwal,
+presensi, tugas, nilai, transkrip, serta penyimpanan data ke file.
+
+Anggota kelompok:
+
 - Jundi Erlangga Luhur Prawira (25/561570/TK/63456)
 - Yuma Binar Aryaputra (25/560457/TK/63303)
 
-## 1. Arsitektur Aplikasi
+## 1. Arsitektur UnivLink
 
-Aplikasi ini menggunakan pola arsitektur berbasis objek (**Object-Oriented Programming / OOP**) di mana titik masuk program (*entry point*) dan manajer utamanya adalah class `SistemAkademik`. 
+UnivLink menggunakan arsitektur berlapis sederhana:
 
-* **State Management**: Sistem ini menyimpan seluruh *state* (seperti pengguna yang sedang aktif) dan bertanggung jawab atas pengelolaan data dalam memori.
-* **Enkapsulasi Penyimpanan**: Penyimpanan data dienkapsulasi menggunakan konsep Interface (`IPenyimpanan`). Dengan pendekatan ini, aplikasi untuk sementara dapat menyimpan data menggunakan file teks/CSV (`PenyimpananFile`), dan di masa mendatang dapat diganti ke penyimpanan Cloud atau Database tanpa perlu mengubah logika inti akademik.
+```text
+CLI (input/output dan menu)
+        |
+        v
+Application root: SistemAkademik
+        |
+        +--> Domain akademik
+        |    User, Mahasiswa, Dosen, Admin
+        |    Kurikulum, MataKuliah, Kelas, KRS
+        |    Jadwal, Ruangan, Tugas, Nilai, Transkrip, ...
+        |
+        +--> Persistence abstraction: IPenyimpanan
+                     |
+                     v
+             PenyimpananFile
+```
 
----
+### Domain layer
 
-## 2. Cara Kerja 4 Pilar OOP dalam Sistem
+Deklarasi class domain berada di `univlink.h`, sedangkan implementasinya
+dipisahkan ke beberapa file `.cpp`. Domain layer menangani aturan akademik,
+misalnya validasi prasyarat, batas SKS, bentrok jadwal, kuota kelas, bobot
+nilai, dan status KRS.
 
-Aplikasi ini secara ketat menerapkan 4 pilar utama Object-Oriented Programming:
+### Application root
+
+`SistemAkademik` adalah aggregate root aplikasi. Class ini memiliki koleksi
+user, mata kuliah, kelas, ruangan, dan kurikulum. Objek utama dimiliki melalui
+`unique_ptr`, sedangkan hubungan antarobjek seperti kelas-dosen,
+kelas-mata-kuliah, dan mahasiswa-kurikulum menggunakan pointer non-owning.
+Class ini juga menangani login, logout, pencarian objek, pencegahan duplikasi,
+serta delegasi penyimpanan.
+
+### CLI layer
+
+`cli.h` dan file `cli_*.cpp` menangani interaksi terminal: membaca input,
+memvalidasi input, menampilkan menu, dan meneruskan aksi ke object domain.
+Karena CLI dipisahkan dari domain, antarmuka lain seperti GUI dapat ditambahkan
+tanpa memindahkan aturan bisnis ke kode menu.
+
+### Persistence layer
+
+`IPenyimpanan` adalah interface abstraksi penyimpanan. Implementasinya,
+`PenyimpananFile`, menyimpan data ke `data/univlink.dat`. Penulisan dilakukan
+melalui file sementara dan backup `data/univlink.bak` agar data lama tidak
+langsung tertimpa ketika terjadi kegagalan.
+
+## 2. Class dan Representasinya
+
+### User dan role
+
+- **`User`**: abstract base class untuk identitas pengguna. Menyimpan nomor
+  induk, nama, email, prodi, password hash, dan operasi umum autentikasi.
+- **`Mahasiswa`**: user mahasiswa. Memiliki KRS, transkrip, kurikulum,
+  pendaftaran/batal kelas, validasi prasyarat, batas SKS, detail kelas, dan
+  pengumpulan tugas.
+- **`Dosen`**: user pengajar. Mengelola kelas yang diampu, pengumuman, tugas,
+  skor tugas, komponen nilai, presensi, dan finalisasi nilai.
+- **`Admin`**: user pengelola sistem. Mengelola ruangan, membuat kelas,
+  menempatkan kelas ke ruangan dan jadwal, serta memvalidasi penempatan.
+
+### Kurikulum dan mata kuliah
+
+- **`Kurikulum`**: merepresentasikan kurikulum suatu prodi dan tahun. Class ini
+  memetakan mata kuliah ke semester, menyediakan pencarian mata kuliah, dan
+  memvalidasi graf prasyarat.
+- **`MataKuliah`**: abstract class untuk mata kuliah, dengan kode, nama, SKS,
+  semester, bobot komponen nilai, dan daftar prasyarat.
+- **`MataKuliahTeori`**: mata kuliah yang membutuhkan ruangan bertipe `KELAS`
+  dan menggunakan perhitungan nilai teori.
+- **`MataKuliahPraktikum`**: mata kuliah yang membutuhkan ruangan bertipe
+  `LAB` dan menggunakan perhitungan nilai praktikum.
+
+### Kelas dan kegiatan akademik
+
+- **`Kelas`**: penawaran mata kuliah pada periode tertentu. Menghubungkan mata
+  kuliah, dosen, ruangan, jadwal, peserta KRS, tugas, pertemuan, dan
+  pengumuman.
+- **`KRS`**: rencana studi mahasiswa untuk satu periode. Menyimpan status
+  `DRAFT` atau `DISAHKAN`, daftar kelas, total SKS, dan aturan validasi.
+- **`Jadwal`**: hari, waktu mulai, dan waktu selesai; memvalidasi waktu dan
+  mendeteksi bentrok.
+- **`Ruangan`**: kode, gedung, kapasitas, jenis ruangan, dan jadwal kelas yang
+  menggunakan ruangan.
+- **`Pertemuan`**: satu sesi perkuliahan, termasuk nomor pertemuan, tanggal,
+  materi, dan catatan kehadiran.
+- **`Tugas`**: metadata tugas, deadline, bobot, dan daftar pengumpulan.
+- **`Pengumpulan`**: file yang dikumpulkan mahasiswa, waktu pengumpulan, skor,
+  dan status sudah dinilai.
+- **`Pengumuman`**: pengumuman dosen yang dapat diedit dan dipublikasikan.
+
+### Penilaian
+
+- **`Nilai`**: nilai seorang mahasiswa pada satu kelas. Menyimpan komponen
+  nilai, menghitung nilai akhir, mengonversi nilai huruf, dan mengunci nilai
+  setelah finalisasi.
+- **`Transkrip`**: kumpulan nilai final mahasiswa untuk menghitung IPS, IPK,
+  mata kuliah lulus, dan total SKS lulus.
+- **`KonversiNilai`**: utility statis untuk mengubah skor angka menjadi nilai
+  huruf, bobot huruf, teks nilai, dan status lulus.
+
+### Sistem dan penyimpanan
+
+- **`IPenyimpanan`**: interface dengan operasi `muat()` dan `simpan()`.
+- **`PenyimpananFile`**: implementasi `IPenyimpanan` berbasis file teks.
+- **`SistemAkademik`**: pusat agregasi, lookup, autentikasi, dan persistence.
+
+## 3. Empat Pilar OOP pada UnivLink
 
 ### A. Encapsulation (Enkapsulasi)
-Membatasi hak akses data untuk menjaga integritas data:
-* **Private (`-`)**: Atribut krusial seperti kata sandi (`passwordHash` pada `User`), IPK (`ipk` pada `Mahasiswa`), `listNilai`, dan kuota kelas disembunyikan. Data ini tidak dapat diubah langsung dari luar, melainkan harus melalui *method* yang memiliki validasi ketat.
-* **Protected (`#`)**: Data yang dibutuhkan oleh class turunan, tetapi ditutup untuk umum. Contohnya: identitas `User` (`nomorInduk`, `nama`, `email`) yang perlu diakses oleh `Mahasiswa` atau `Dosen` untuk mencetak dashboard. Demikian juga `bobotKomponen` pada `MataKuliah`.
-* **Public (`+`)**: Method antarmuka resmi (seperti `ambilKelas()`, `inputNilai()`) yang dapat dipanggil oleh komponen lain.
+
+Data internal class dilindungi dan hanya dimodifikasi melalui method dengan
+validasi:
+
+- `User::passwordHash` bersifat private. Password diproses melalui
+  `verifikasiPassword()` dan `gantiPassword()`, bukan diubah langsung.
+- `KRS::status` dan daftar kelas diubah melalui `tambahKelas()`,
+  `hapusKelas()`, `validasi()`, dan `sahkan()`.
+- `Nilai` menyembunyikan komponen nilai, skor akhir, nilai huruf, bobot, dan
+  status finalisasi. Perubahan dilakukan melalui `updateKomponen()` dan
+  `finalisasi()`.
+- `Kelas` memiliki koleksi tugas, pertemuan, dan pengumuman sebagai data
+  internal. Akses dilakukan melalui method seperti `tambahTugas()`,
+  `catatKehadiran()`, dan `getPengumumanAktif()`.
+- `Transkrip` menyimpan `listNilai` secara private dan menyediakan operasi
+  `hitungIPS()`, `hitungIPK()`, `sudahLulus()`, serta `totalSKSLulus()`.
+- `SistemAkademik` mengontrol kepemilikan objek melalui `unique_ptr` dan
+  mencegah duplikasi melalui `tambahUser()`, `tambahKelas()`,
+  `tambahRuangan()`, dan method penambahan lainnya.
+- Validasi domain menjaga konsistensi data: skor harus berada pada rentang
+  yang benar, jadwal harus valid, ruangan harus cocok dengan jenis mata kuliah,
+  kelas tidak boleh melebihi kuota, dan KRS harus memenuhi prasyarat serta
+  batas SKS.
 
 ### B. Abstraction (Abstraksi)
-Menyembunyikan kerumitan di balik interface:
-* `User` dan `MataKuliah` adalah *abstract class* yang tidak dapat diinstansiasi langsung menjadi objek.
-* Kompleksitas perhitungan seperti kalkulasi IPK disembunyikan di dalam class `Transkrip`.
+
+Detail implementasi disembunyikan di balik interface dan operasi tingkat
+tinggi:
+
+- `User` adalah abstract class dengan operasi role, dashboard, dan menu yang
+  didefinisikan secara virtual.
+- `MataKuliah` adalah abstract class dengan operasi virtual
+  `getJenisRuangan()` dan `hitungNilaiAkhir()`.
+- `IPenyimpanan` menyembunyikan teknologi penyimpanan dari
+  `SistemAkademik`; aplikasi hanya menggunakan `muat()` dan `simpan()`.
+- `PenyimpananFile` menyembunyikan format record, escaping karakter, file
+  sementara, dan backup.
+- `Transkrip` menyembunyikan algoritma perhitungan IPS, IPK, dan status lulus.
+- `KonversiNilai` menyembunyikan tabel konversi skor angka ke nilai huruf dan
+  bobot.
+- CLI memisahkan detail input/output terminal dari aturan bisnis domain.
 
 ### C. Inheritance (Pewarisan)
-* Class `Mahasiswa`, `Dosen`, dan `Admin` mewarisi atribut identitas dan perilaku umum dari class `User`.
-* Class `MataKuliahTeori` dan `MataKuliahPraktikum` mewarisi properti dari class `MataKuliah`.
+
+Hubungan pewarisan yang digunakan:
+
+- `Mahasiswa`, `Dosen`, dan `Admin` mewarisi `User`.
+- `MataKuliahTeori` dan `MataKuliahPraktikum` mewarisi `MataKuliah`.
+- `PenyimpananFile` mewarisi `IPenyimpanan`.
+
+Pewarisan memungkinkan setiap subclass menggunakan data dan perilaku umum
+class induknya, lalu menambahkan perilaku khusus sesuai perannya.
 
 ### D. Polymorphism (Polimorfisme)
-* **Dinamis (Overriding)**: Pemanggilan `tampilkanDashboard()` atau `getPeran()` pada pointer `User*` akan otomatis menyesuaikan dengan bentuk objek aslinya (`Mahasiswa`/`Dosen`/`Admin`). Hal serupa berlaku pada method `hitungNilaiAkhir()` pada class `MataKuliah`.
-* **Statis (Overloading)**: Method `cariMataKuliah()` pada class `Kurikulum` memiliki dua versi berdasarkan tipe data parameternya; mencari berdasarkan `string` (kode mata kuliah) atau berdasarkan `integer` (semester).
 
----
+#### Dynamic polymorphism
 
-## 3. Detail Class, Atribut, dan Method
+- Pointer `User*` dapat menunjuk ke `Mahasiswa`, `Dosen`, atau `Admin`.
+  Pemanggilan `getPeran()`, `tampilkanDashboard()`, dan `tampilkanMenu()`
+  menjalankan override sesuai tipe object sebenarnya.
+- Pointer `MataKuliah*` dapat menunjuk ke `MataKuliahTeori` atau
+  `MataKuliahPraktikum`. Method `getJenisRuangan()` dan
+  `hitungNilaiAkhir()` menghasilkan perilaku berbeda.
+- Pointer `IPenyimpanan*` dapat menunjuk ke `PenyimpananFile`; pemanggilan
+  `muat()` dan `simpan()` menggunakan implementasi file.
+- `cli_login.cpp` mengarahkan user aktif ke menu role yang sesuai setelah
+  login.
 
-Sistem dibagi menjadi beberapa kelompok (*Package*) agar modular dan mudah dirawat:
+#### Static polymorphism melalui overloading
 
-### A. Package Sistem
-* **`SistemAkademik`**: Pemilik data (*owner*) dan pengatur alur utama.
-  * *Fungsi*: Menyediakan fitur `login()`, `logout()`, serta pencarian user dan kelas. Class ini memiliki akses ke seluruh entitas objek di dalam sistem.
-* **`IPenyimpanan` & `PenyimpananFile`**: Interface penyimpanan data.
-  * Memiliki fungsi *pure virtual* `muat()` dan `simpan()` yang diimplementasikan oleh class `PenyimpananFile`.
+- `Kurikulum::cariMataKuliah(const string& kode)` mencari berdasarkan kode.
+- `Kurikulum::cariMataKuliah(int semester)` mencari seluruh mata kuliah pada
+  semester tertentu.
 
-### B. Package User
-* **`User` (Abstract Class)**: Kerangka dasar pengguna.
-  * *Atribut*: Menyimpan identitas (`NIM`/`NIP`, `nama`, `email`, `prodi`) dengan hak akses `protected`, dan `passwordHash` dengan hak akses `private`.
-  * *Method*: `verifikasiPassword()`, `gantiPassword()`, serta deklarasi virtual `tampilkanDashboard()`.
-* **`Mahasiswa`**: Bertindak sebagai aktor untuk fitur KRS dan akademik.
-  * *Method Utama*: `buatKRS()`, `ambilKelas()`, `hitungMaxSKS()` (menghitung batas dinamis 15/18/21/24 SKS dari IPS), `lihatTranskrip()`, dan `submitTugas()`.
-  * *Fungsi Khusus*: `cekPrasyarat()` yang mendelegasikan pengecekan kelulusan mata kuliah prasyarat kepada class `Transkrip`.
-* **`Dosen`**: Aktor pengelola kegiatan belajar mengajar.
-  * *Method Utama*: `buatPengumuman()`, `buatTugas()`, `beriSkorTugas()`, `inputNilai()`, `updateKehadiran()`, serta `finalisasiNilai()` untuk mengunci nilai di akhir semester.
-* **`Admin`**: Aktor pengelola sistem (*Back-office*).
-  * *Method Utama*: `buatKelas()`, `tambahRuangan()`, dan `assignRuangan()` ke kelas.
+## 4. Struktur Folder dan File
 
-### C. Package Kurikulum & Mata Kuliah
-* **`Kurikulum`**: Menyimpan peta semester (integrasi map semester dengan himpunan `MataKuliah`).
-  * *Method Khusus*: `validasiGrafPrasyarat()` untuk mengecek apakah ada prasyarat berulang/siklis menggunakan algoritma Depth-First Search (DFS).
-* **`MataKuliah` (Abstract Class)**: Menyimpan `kodeMK`, `SKS`, dan himpunan prasyarat.
-  * *Pure Virtual Method*: `getJenisRuangan()` dan `hitungNilaiAkhir()`.
-  * **`MataKuliahTeori`**: Jenis ruangannya adalah `KELAS`. Komponen nilai umumnya terdiri dari UTS, UAS, dan Tugas.
-  * **`MataKuliahPraktikum`**: Jenis ruangannya adalah `LAB`. Komponen nilainya berbeda (misal: Praktik, Laporan, Responsi).
+Semua perintah build dijalankan dari folder root repository.
 
-### D. Package Kelas & Kegiatan
-* **`Kelas`**: Representasi operasional suatu mata kuliah di periode tertentu.
-  * *Atribut*: `kuota`, `idKelas`, serta relasi ke `Pengumuman`, `Tugas`, `Jadwal`, dan `Ruangan`.
-  * *Method*: `daftarkan()`, `catatKehadiran()` (presensi per pertemuan), `hitungPersentaseKehadiran()`, dan `hitungDistribusiNilai()` (membuat statistik A–E).
-* **`Ruangan` & `Jadwal`**: Mengelola ketersediaan kelas.
-  * *Method*: `tersedia()` dan `bentrokDengan()` untuk mengecek bentrokan waktu atau kondisi melebihi kapasitas ruangan.
-* **`KRS` (Kartu Rencana Studi)**: Pemegang *state* registrasi per semester bagi setiap mahasiswa.
-  * *Atribut & Fungsi*: Status `DRAFT` atau `DISAHKAN`. Method `validasi()` mengecek prasyarat, kuota, SKS maksimum, dan bentrok jadwal sebelum kelas ditambahkan.
-* **`Tugas` & `Pengumpulan`**: `Tugas` memiliki *deadline* dan *bobot*, sedangkan `Pengumpulan` menyimpan *file*, *timestamp*, dan *skor* mahasiswa.
-* **`Pertemuan`**: Menyimpan materi dan catatan presensi (map `Nomor Induk` dengan status kehadiran boolean) per sesi tatap muka.
+### Root project
 
-### E. Package Penilaian
-* **`Nilai`**: Terikat pada satu mahasiswa dan satu kelas. Menyimpan nilai per komponen.
-  * *Fungsi*: `finalisasi()` mengkalkulasi skor angka menjadi `NilaiHuruf` dan membekukan statusnya agar dapat dimasukkan ke transkrip.
-* **`Transkrip`**: Memiliki rekam jejak `Nilai` final.
-  * *Fungsi Utama*: Mengeksekusi perhitungan akademik inti seperti `hitungIPS()`, `hitungIPK()`, dan memvalidasi `sudahLulus()` untuk pengecekan prasyarat.
-* **`KonversiNilai`**: Berisi aturan *static* untuk mengonversi angka desimal ($0 - 100$) menjadi huruf mutu ($A$ sampai $E$) dan nilai bobot ($4.00$ sampai $0.00$).
+| File | Deskripsi singkat |
+|---|---|
+| `univlink.h` | Deklarasi seluruh enum, class domain, interface, dan `SistemAkademik`. |
+| `main.cpp` | Entry point: membuat persistence, memuat data, melakukan seed bila perlu, menjalankan CLI, lalu menyimpan data. |
+| `seed.cpp` | Data contoh awal: user, mata kuliah, kurikulum, ruangan, kelas, dan jadwal. |
+| `Makefile` | Target `all`, `asan`, `test`, dan `clean`. |
+| `README.md` | Dokumentasi proyek. |
+| `.gitignore` | File hasil build dan data runtime yang diabaikan Git. |
 
----
+### Implementasi domain
 
-## 4. Relasi Antar Class (UML)
+| File | Deskripsi singkat |
+|---|---|
+| `user.cpp` | Password hashing, verifikasi password, ganti password, dan perilaku umum user. |
+| `mahasiswa.cpp` | Implementasi constructor `Mahasiswa`. |
+| `mahasiswa_cli.cpp` | Operasi akademik dan dashboard/menu mahasiswa. |
+| `dosen.cpp` | Pengumuman, tugas, nilai, presensi, dan finalisasi nilai dosen. |
+| `admin.cpp` | Pengelolaan user/ruangan serta pembuatan dan penempatan kelas. |
+| `sistem.cpp` | Kepemilikan object, lookup, login/logout, dan delegasi persistence. |
+| `kurikulum.cpp` | Implementasi mata kuliah, bobot nilai, prasyarat, dan kurikulum. |
+| `kelas.cpp` | Pendaftaran peserta, tugas, pertemuan, pengumuman, presensi, dan statistik. |
+| `kelas_statistik.cpp` | Perhitungan statistik kelas yang dipisahkan dari operasi utama `Kelas`. |
+| `krs.cpp` | Validasi dan pengelolaan KRS. |
+| `jadwal.cpp` | Validasi waktu dan bentrok jadwal. |
+| `ruangan.cpp` | Kapasitas, tipe, pemesanan, dan pelepasan ruangan. |
+| `kegiatan.cpp` | Implementasi `Pertemuan`, `Pengumpulan`, `Tugas`, dan `Pengumuman`. |
+| `nilai.cpp` | Komponen nilai, nilai akhir, finalisasi, dan status lulus. |
+| `transkrip.cpp` | Perhitungan IPS, IPK, nilai terbaik, dan SKS lulus. |
+| `konversi_nilai.cpp` | Konversi skor angka ke nilai huruf dan bobot. |
+| `penyimpanan_file.cpp` | Serialisasi/deserialisasi data ke `data/univlink.dat`. |
 
-1. **Composition (`*--`)**: Objek anak yang masa hidupnya ditentukan oleh induknya.
-   * `Mahasiswa` memuat `Transkrip`.
-   * `Kelas` memuat `Jadwal`, `Tugas`, dan `Pertemuan`. *(Jika kelas dihapus, maka jadwal, tugas, dan pertemuan di dalamnya ikut terhapus).*
-2. **Aggregation (`o--`)**: Kepemilikan tidak mutlak (*weak association*).
-   * `SistemAkademik` menampung daftar `User`.
-   * `Kurikulum` menampung daftar `MataKuliah`.
-3. **Association (`-->`)**: Relasi keterhubungan antar komponen.
-   * `Kelas` diampu oleh satu `Dosen`.
-   * `Kelas` berlangsung di sebuah `Ruangan`.
-   * Relasi Prasyarat dibentuk sebagai *self-association* di dalam class `MataKuliah`.
+### Implementasi CLI
 
----
+| File | Deskripsi singkat |
+|---|---|
+| `cli.h` | Deklarasi fungsi CLI, menu, dan helper input. |
+| `cli_util.cpp` | Parsing input, validasi, formatting, tabel, dan layar ganti password. |
+| `cli_login.cpp` | Layar login, registrasi mahasiswa, dispatch role, dan logout. |
+| `cli_mahasiswa_menu.cpp` | Menu dan alur interaksi mahasiswa. |
+| `cli_dosen_menu.cpp` | Menu dan alur interaksi dosen. |
+| `cli_admin_menu.cpp` | Menu dan alur interaksi admin. |
 
-## 5. Algoritma & Cara Kerja Sistem (Alur Eksekusi)
+### Folder lain
 
+- `tests/` berisi `test_b_phase1.cpp` dan `test_domain.cpp` untuk pengujian
+  domain, KRS, penilaian, seed, jadwal, dan persistence.
+- `uml/` berisi diagram class PlantUML (`univlinkclass.puml`) dan hasil
+  visualisasi Draw.io (`univlink.drawio.png`).
+- `proj/` berisi salinan/snapshot sumber terpisah dan tidak digunakan oleh
+  Makefile root.
+- `data/` dibuat saat aplikasi menyimpan data. File utamanya adalah
+  `univlink.dat` dan backup-nya `univlink.bak`.
+
+## 5. Build Aplikasi dengan g++
+
+### Prasyarat
+
+- GNU g++ yang mendukung C++17.
+- GNU Make bersifat opsional; perintah `g++` langsung dapat digunakan.
+
+### Cara build dengan Makefile
+
+Dari root repository:
+### Cara build langsung dengan g++
+
+Linux/macOS/Git Bash:
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 -o univlink \
+  main.cpp admin.cpp cli_admin_menu.cpp cli_dosen_menu.cpp cli_login.cpp \
+  cli_mahasiswa_menu.cpp cli_util.cpp dosen.cpp jadwal.cpp kegiatan.cpp \
+  kelas.cpp kelas_statistik.cpp konversi_nilai.cpp krs.cpp kurikulum.cpp \
+  mahasiswa.cpp mahasiswa_cli.cpp nilai.cpp penyimpanan_file.cpp ruangan.cpp \
+  seed.cpp sistem.cpp transkrip.cpp user.cpp
 ```
-[Mahasiswa Tambah MK] ──► [1. Cek Status KRS]
-                               │
-                               ▼
-                       [2. Cek Prasyarat Transkrip]
-                               │
-                               ▼
-                       [3. Cek Kuota Kelas]
-                               │
-                               ▼
-                       [4. Cek Limit SKS Dinamis]
-                               │
-                               ▼
-                       [5. Cek Bentrok Jadwal]
-                               │
-                               ▼
-                      (Terdaftar di Kelas)
+
+Windows PowerShell:
+
+```powershell
+g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 -o univlink.exe `
+  main.cpp admin.cpp cli_admin_menu.cpp cli_dosen_menu.cpp cli_login.cpp `
+  cli_mahasiswa_menu.cpp cli_util.cpp dosen.cpp jadwal.cpp kegiatan.cpp `
+  kelas.cpp kelas_statistik.cpp konversi_nilai.cpp krs.cpp kurikulum.cpp `
+  mahasiswa.cpp mahasiswa_cli.cpp nilai.cpp penyimpanan_file.cpp ruangan.cpp `
+  seed.cpp sistem.cpp transkrip.cpp user.cpp
+```
+## 6. Cara Menjalankan Aplikasi
+
+Jalankan dari root repository agar folder relatif `data/` ditemukan:
+
+```bash
+./univlink
 ```
 
-### A. Alur Validasi KRS (Pendaftaran Mata Kuliah)
-Ketika Mahasiswa menambah mata kuliah di KRS, sistem menjalankan serangkaian validasi berurutan:
-1. **Cek Status**: Memastikan KRS masih dalam masa pendaftaran (`DRAFT`).
-2. **Cek Prasyarat**: Sistem mengonfirmasi ke class `Transkrip` apakah mahasiswa telah lulus (huruf mutu di atas $E$) pada mata kuliah prasyarat yang dibutuhkan.
-3. **Cek Kuota**: Memastikan jumlah peserta kelas belum melebihi batas kapasitas ($\text{peserta} < \text{kapasitas}$).
-4. **Cek SKS**: $\text{Total SKS saat ini} + \text{SKS MK baru} \le \text{SKS Maksimal Dinamis}$.
-5. **Cek Jadwal**: Memastikan tidak ada tumpang tindih waktu (jam dan hari) dengan mata kuliah lain yang sudah ada di dalam KRS.
-6. **Eksekusi**: Jika seluruh poin 1–5 terpenuhi, mahasiswa berhasil terdaftar pada kelas tersebut.
+Windows PowerShell:
 
-### B. Alur Penentuan Batas SKS Dinamis
-Sistem mengambil data dari `Transkrip` untuk menghitung IP Semester (IPS) terakhir. Batas maksimum SKS ditarik berdasarkan ketentuan berikut:
+```powershell
+.\univlink.exe
+```
 
-$$
-\text{Batas SKS} = 
-\begin{cases} 
-24 \text{ SKS}, & \text{jika } IPS \ge 3.00 \\ 
-21 \text{ SKS}, & \text{jika } 2.50 \le IPS \le 2.99 \\ 
-18 \text{ SKS}, & \text{jika } 2.00 \le IPS \le 2.49 \\ 
-15 \text{ SKS}, & \text{jika } IPS < 2.00 
-\end{cases}
-$$
+Saat pertama kali dijalankan tanpa data user, `seed.cpp` membuat data contoh
+secara otomatis. Data berikut dapat digunakan untuk login:
 
-### C. Alur Input dan Finalisasi Nilai
-1. **Input Nilai**: Selama semester berjalan, Dosen menginput skor per komponen (misal: Tugas, Kuis, UTS) via method `inputNilai()`.
-2. **Penyimpanan Sementara**: Data masuk ke objek `Nilai` dan masih bersifat dapat diubah (*editable*).
-3. **Eksekusi Finalisasi**: Di akhir semester, Dosen memanggil method `finalisasiNilai()`.
-4. **Kalkulasi Polimorfik**: Function `hitungNilaiAkhir()` pada `MataKuliah` diaktifkan untuk menghitung rata-rata berbobot seluruh skor komponen.
-5. **Konversi Mutu**: Angka mentah ($0 - 100$) diproses oleh `KonversiNilai` untuk menghasilkan Huruf Mutu ($A - E$) dan nilai bobot ($4.00 - 0.00$).
-6. **Pembekuan Status**: Status nilai terkunci (`isFinal() == true`) dan dikirim ke `Transkrip` untuk pemrosesan IPS/IPK.
+| Role | Nomor induk | Password |
+|---|---|---|
+| Admin | `A001` | `admin123` |
+| Dosen | `D001` | `dosen123` |
+| Dosen | `D002` | `dosen123` |
+| Mahasiswa | `M001` | `mhs12345` |
+| Mahasiswa | `M002` | `mhs12345` |
+| Mahasiswa | `M003` | `mhs12345` |
+
+Profil demo mahasiswa:
+
+- `M001` adalah mahasiswa semester 3 dengan IPK 3.26 dan IPS semester 2
+  sebesar 3.02. Seluruh tugas contoh pada kelasnya sudah dikumpulkan dan
+  dinilai.
+- `M002` adalah mahasiswa semester 5 dengan IPK 2.50 dan IPS semester 4
+  sebesar 2.60. Hanya separuh tugas contoh yang dikumpulkan; sisanya tetap
+  berstatus belum dikumpulkan.
+- `M003` adalah mahasiswa semester 1 tanpa nilai historis.
+
+Ganti password setelah login pertama apabila aplikasi digunakan di luar
+lingkungan demo.
+
+## 7. Cara Menggunakan Aplikasi
+
+### Layar awal
+
+```text
+1. Masuk
+2. Daftar akun mahasiswa
+0. Keluar
+```
+
+Login dibatasi sampai tiga percobaan gagal. Setelah login, aplikasi
+menampilkan menu sesuai role.
+
+### Alur mahasiswa
+
+1. Pilih **Registrasi Mata Kuliah (KRS)**.
+2. Buat atau pilih KRS untuk periode berjalan.
+3. Pilih kelas yang tersedia. Sistem memeriksa status KRS, prasyarat, kuota,
+   batas SKS, dan bentrok jadwal.
+4. Lihat atau batalkan kelas selama KRS masih dapat diubah.
+5. Sahkan KRS setelah daftar kelas selesai.
+6. Gunakan **Detail Kelas & Portal Tugas** untuk melihat jadwal, presensi,
+   tugas, dan nilai.
+7. Kumpulkan atau perbarui file tugas sebelum deadline.
+8. Gunakan **Lihat Transkrip Nilai** untuk melihat IPS, IPK, nilai final, dan
+   SKS lulus.
+9. Gunakan **Lihat Pengumuman** dan **Ganti Kata Sandi** sesuai kebutuhan.
+
+### Alur dosen
+
+1. Pilih kelas yang diampu dari dashboard.
+2. Buat, edit, dan publikasikan pengumuman.
+3. Buat tugas dengan judul, deskripsi, deadline, dan bobot.
+4. Lihat pengumpulan mahasiswa dan beri skor.
+5. Catat presensi setiap pertemuan.
+6. Input nilai berdasarkan komponen penilaian.
+7. Periksa distribusi nilai, lalu finalisasi nilai ketika sudah selesai.
+8. Logout untuk kembali ke layar awal dan menyimpan perubahan.
+
+Operasi dosen dibatasi pada kelas yang benar-benar diampu oleh dosen tersebut.
+
+### Alur admin
+
+1. Kelola pengguna dosen, mahasiswa, dan admin.
+2. Kelola mata kuliah, bobot penilaian, prasyarat, dan kurikulum.
+3. Tambahkan ruangan dengan kapasitas dan tipe `KELAS` atau `LAB`.
+4. Buat kelas untuk mata kuliah dan dosen pada periode tertentu.
+5. Tempatkan kelas ke ruangan dan jadwal yang valid.
+6. Sistem menolak penempatan yang tidak cocok tipe ruangan, melebihi kapasitas,
+   atau bentrok dengan kelas lain.
+7. Gunakan dashboard untuk memeriksa peserta dan detail kelas.
+
+## 8. Format Data dan Siklus Program
+
+Alur utama `main.cpp` adalah:
+
+1. Membuat `PenyimpananFile("data")` dan `SistemAkademik`.
+2. Memuat data dari `data/univlink.dat`.
+3. Jika data belum memiliki user, memanggil `isiDataAwal()`.
+4. Menjalankan `jalankanAplikasi()`.
+5. Menyimpan perubahan ketika aplikasi selesai atau user logout sesuai alur
+   CLI.
+
+`PenyimpananFile` menyimpan record teks dengan pemisah `|` dan escaping untuk
+karakter khusus. Record mencakup mata kuliah, prasyarat, kurikulum, ruangan,
+user, kelas, KRS, pertemuan, tugas, pengumpulan, pengumuman, dan nilai.
+Jika data rusak atau formatnya tidak valid, proses muat mengembalikan gagal
+dan aplikasi tidak menimpa file data lama.
