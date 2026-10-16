@@ -10,7 +10,7 @@
 //   2. M002 / mhs12345 (semester 5, IPK 2.50)
 //   3. M003 / mhs12345 (semester 1)
 
-#include "cli.h"
+#include "cli/cli.h"
 
 void isiDataAwal(SistemAkademik& sistem) {
     // ---- mata kuliah ----
