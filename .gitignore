@@ -1,4 +1,5 @@
 data/
 *.o
 univlink
+univlink.exe
 uji_data_*/

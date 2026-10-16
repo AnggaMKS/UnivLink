@@ -33,7 +33,7 @@ Application root: SistemAkademik
 
 ### Domain layer
 
-Deklarasi class domain berada di `univlink.h`, sedangkan implementasinya
+Deklarasi class domain berada di `akademik/univlink.h`, sedangkan implementasinya
 dipisahkan ke beberapa file `.cpp`. Domain layer menangani aturan akademik,
 misalnya validasi prasyarat, batas SKS, bentrok jadwal, kuota kelas, bobot
 nilai, dan status KRS.
@@ -206,45 +206,62 @@ Semua perintah build dijalankan dari folder root repository.
 
 | File | Deskripsi singkat |
 |---|---|
-| `univlink.h` | Deklarasi seluruh enum, class domain, interface, dan `SistemAkademik`. |
-| `main.cpp` | Entry point: membuat persistence, memuat data, melakukan seed bila perlu, menjalankan CLI, lalu menyimpan data. |
-| `seed.cpp` | Data contoh awal: user, mata kuliah, kurikulum, ruangan, kelas, dan jadwal. |
-| `Makefile` | Target `all`, `asan`, `test`, dan `clean`. |
 | `README.md` | Dokumentasi proyek. |
 | `.gitignore` | File hasil build dan data runtime yang diabaikan Git. |
 
-### Implementasi domain
+Struktur utama:
+
+```text
+app/       entry point dan seed data
+cli/       antarmuka terminal dan menu
+akademik/  class domain akademik
+storage/   implementasi persistence
+data/      data runtime
+references/ dan uml/  aset dokumentasi
+```
+
+| `akademik/univlink.h` | Deklarasi seluruh enum, class domain, interface, dan `SistemAkademik`. |
+| `app/main.cpp` | Entry point: membuat persistence, memuat data, melakukan seed bila perlu, menjalankan CLI, lalu menyimpan data. |
+| `app/seed.cpp` | Data contoh awal: user, mata kuliah, kurikulum, ruangan, kelas, dan jadwal. |
+
+### `akademik/`
 
 | File | Deskripsi singkat |
 |---|---|
-| `user.cpp` | Password hashing, verifikasi password, ganti password, dan perilaku umum user. |
-| `mahasiswa.cpp` | Implementasi constructor `Mahasiswa`. |
-| `mahasiswa_cli.cpp` | Operasi akademik dan dashboard/menu mahasiswa. |
-| `dosen.cpp` | Pengumuman, tugas, nilai, presensi, dan finalisasi nilai dosen. |
-| `admin.cpp` | Pengelolaan user/ruangan serta pembuatan dan penempatan kelas. |
-| `sistem.cpp` | Kepemilikan object, lookup, login/logout, dan delegasi persistence. |
-| `kurikulum.cpp` | Implementasi mata kuliah, bobot nilai, prasyarat, dan kurikulum. |
-| `kelas.cpp` | Pendaftaran peserta, tugas, pertemuan, pengumuman, presensi, dan statistik. |
-| `kelas_statistik.cpp` | Perhitungan statistik kelas yang dipisahkan dari operasi utama `Kelas`. |
-| `krs.cpp` | Validasi dan pengelolaan KRS. |
-| `jadwal.cpp` | Validasi waktu dan bentrok jadwal. |
-| `ruangan.cpp` | Kapasitas, tipe, pemesanan, dan pelepasan ruangan. |
-| `kegiatan.cpp` | Implementasi `Pertemuan`, `Pengumpulan`, `Tugas`, dan `Pengumuman`. |
-| `nilai.cpp` | Komponen nilai, nilai akhir, finalisasi, dan status lulus. |
-| `transkrip.cpp` | Perhitungan IPS, IPK, nilai terbaik, dan SKS lulus. |
-| `konversi_nilai.cpp` | Konversi skor angka ke nilai huruf dan bobot. |
-| `penyimpanan_file.cpp` | Serialisasi/deserialisasi data ke `data/univlink.dat`. |
+| `akademik/univlink.h` | Deklarasi class domain, interface, dan `SistemAkademik`. |
+| `akademik/user.cpp` | Password hashing, verifikasi password, ganti password, dan perilaku umum user. |
+| `akademik/mahasiswa.cpp` | Implementasi constructor dan operasi inti `Mahasiswa`. |
+| `akademik/dosen.cpp` | Pengumuman, tugas, nilai, presensi, dan finalisasi nilai dosen. |
+| `akademik/admin.cpp` | Pengelolaan ruangan serta pembuatan dan penempatan kelas. |
+| `akademik/sistem.cpp` | Kepemilikan object, lookup, login/logout, dan delegasi persistence. |
+| `akademik/kurikulum.cpp` | Implementasi mata kuliah, bobot nilai, prasyarat, dan kurikulum. |
+| `akademik/kelas.cpp` | Pendaftaran peserta, tugas, pertemuan, pengumuman, presensi, dan statistik. |
+| `akademik/kelas_statistik.cpp` | Perhitungan statistik kelas yang dipisahkan dari operasi utama `Kelas`. |
+| `akademik/krs.cpp` | Validasi dan pengelolaan KRS. |
+| `akademik/jadwal.cpp` | Validasi waktu dan bentrok jadwal. |
+| `akademik/ruangan.cpp` | Kapasitas, tipe, pemesanan, dan pelepasan ruangan. |
+| `akademik/kegiatan.cpp` | Implementasi `Pertemuan`, `Pengumpulan`, `Tugas`, dan `Pengumuman`. |
+| `akademik/nilai.cpp` | Komponen nilai, nilai akhir, finalisasi, dan status lulus. |
+| `akademik/transkrip.cpp` | Perhitungan IPS, IPK, nilai terbaik, dan SKS lulus. |
+| `akademik/konversi_nilai.cpp` | Konversi skor angka ke nilai huruf dan bobot. |
 
-### Implementasi CLI
+### `cli/`
 
 | File | Deskripsi singkat |
 |---|---|
-| `cli.h` | Deklarasi fungsi CLI, menu, dan helper input. |
-| `cli_util.cpp` | Parsing input, validasi, formatting, tabel, dan layar ganti password. |
-| `cli_login.cpp` | Layar login, registrasi mahasiswa, dispatch role, dan logout. |
-| `cli_mahasiswa_menu.cpp` | Menu dan alur interaksi mahasiswa. |
-| `cli_dosen_menu.cpp` | Menu dan alur interaksi dosen. |
-| `cli_admin_menu.cpp` | Menu dan alur interaksi admin. |
+| `cli/cli.h` | Deklarasi fungsi CLI, menu, dan helper input. |
+| `cli/cli_util.cpp` | Parsing input, validasi, formatting, tabel, dan layar ganti password. |
+| `cli/cli_login.cpp` | Layar login, registrasi mahasiswa, dispatch role, dan logout. |
+| `cli/cli_mahasiswa_menu.cpp` | Menu dan alur interaksi mahasiswa. |
+| `cli/cli_dosen_menu.cpp` | Menu dan alur interaksi dosen. |
+| `cli/cli_admin_menu.cpp` | Menu dan alur interaksi admin. |
+| `cli/mahasiswa_cli.cpp` | Dashboard, transkrip, detail kelas, dan tampilan mahasiswa. |
+
+### `storage/`
+
+| File | Deskripsi singkat |
+|---|---|
+| `storage/penyimpanan_file.cpp` | Serialisasi/deserialisasi data ke `data/univlink.dat`. |
 
 ### Folder lain
 
@@ -264,31 +281,37 @@ Semua perintah build dijalankan dari folder root repository.
 - GNU g++ yang mendukung C++17.
 - GNU Make bersifat opsional; perintah `g++` langsung dapat digunakan.
 
-### Cara build dengan Makefile
 
-Dari root repository:
 ### Cara build langsung dengan g++
 
 Linux/macOS/Git Bash:
 
 ```bash
-g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 -o univlink \
-  main.cpp admin.cpp cli_admin_menu.cpp cli_dosen_menu.cpp cli_login.cpp \
-  cli_mahasiswa_menu.cpp cli_util.cpp dosen.cpp jadwal.cpp kegiatan.cpp \
-  kelas.cpp kelas_statistik.cpp konversi_nilai.cpp krs.cpp kurikulum.cpp \
-  mahasiswa.cpp mahasiswa_cli.cpp nilai.cpp penyimpanan_file.cpp ruangan.cpp \
-  seed.cpp sistem.cpp transkrip.cpp user.cpp
+g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 -I. -o univlink \
+  app/main.cpp app/seed.cpp \
+  cli/cli_util.cpp cli/cli_login.cpp cli/cli_admin_menu.cpp \
+  cli/cli_dosen_menu.cpp cli/cli_mahasiswa_menu.cpp cli/mahasiswa_cli.cpp \
+  akademik/admin.cpp akademik/dosen.cpp akademik/jadwal.cpp \
+  akademik/kegiatan.cpp akademik/kelas.cpp akademik/kelas_statistik.cpp \
+  akademik/konversi_nilai.cpp akademik/krs.cpp akademik/kurikulum.cpp \
+  akademik/mahasiswa.cpp akademik/nilai.cpp akademik/ruangan.cpp \
+  akademik/sistem.cpp akademik/transkrip.cpp akademik/user.cpp \
+  storage/penyimpanan_file.cpp
 ```
 
 Windows PowerShell:
 
 ```powershell
-g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 -o univlink.exe `
-  main.cpp admin.cpp cli_admin_menu.cpp cli_dosen_menu.cpp cli_login.cpp `
-  cli_mahasiswa_menu.cpp cli_util.cpp dosen.cpp jadwal.cpp kegiatan.cpp `
-  kelas.cpp kelas_statistik.cpp konversi_nilai.cpp krs.cpp kurikulum.cpp `
-  mahasiswa.cpp mahasiswa_cli.cpp nilai.cpp penyimpanan_file.cpp ruangan.cpp `
-  seed.cpp sistem.cpp transkrip.cpp user.cpp
+g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 -I. -o univlink.exe `
+  app/main.cpp app/seed.cpp `
+  cli/cli_util.cpp cli/cli_login.cpp cli/cli_admin_menu.cpp `
+  cli/cli_dosen_menu.cpp cli/cli_mahasiswa_menu.cpp cli/mahasiswa_cli.cpp `
+  akademik/admin.cpp akademik/dosen.cpp akademik/jadwal.cpp `
+  akademik/kegiatan.cpp akademik/kelas.cpp akademik/kelas_statistik.cpp `
+  akademik/konversi_nilai.cpp akademik/krs.cpp akademik/kurikulum.cpp `
+  akademik/mahasiswa.cpp akademik/nilai.cpp akademik/ruangan.cpp `
+  akademik/sistem.cpp akademik/transkrip.cpp akademik/user.cpp `
+  storage/penyimpanan_file.cpp
 ```
 ## 6. Cara Menjalankan Aplikasi
 
@@ -383,7 +406,7 @@ Operasi dosen dibatasi pada kelas yang benar-benar diampu oleh dosen tersebut.
 
 ## 8. Format Data dan Siklus Program
 
-Alur utama `main.cpp` adalah:
+Alur utama `app/main.cpp` adalah:
 
 1. Membuat `PenyimpananFile("data")` dan `SistemAkademik`.
 2. Memuat data dari `data/univlink.dat`.
